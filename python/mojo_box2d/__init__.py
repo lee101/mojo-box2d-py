@@ -511,6 +511,14 @@ def b2Distance(
         bx, by = transformB.position.x, transformB.position.y
         bc, bs = transformB.q.c, transformB.q.s
     buffers = _distance_buffers()
+    use_radii = bool(useRadii)
+    key = (
+        shapeA, av_addr, an, ar, ax, ay, ac, ass,
+        shapeB, bv_addr, bn, br, bx, by, bc, bs,
+        use_radii,
+    )
+    if getattr(buffers, "last_key", None) == key:
+        return buffers.last_result
     params = buffers.params
     params[:] = (
         an, ar, ax, ay, ac, ass,
@@ -518,15 +526,18 @@ def b2Distance(
     )
     iterations = lib().mb2_distance_packed(
         av_addr, bv_addr, buffers.params_addr,
-        int(bool(useRadii)), buffers.result_addr,
+        int(use_radii), buffers.result_addr,
     )
     result = buffers.result
-    return b2DistanceResult(
+    value = b2DistanceResult(
         (float(result[0]), float(result[1])),
         (float(result[2]), float(result[3])),
         float(result[4]),
         int(iterations),
     )
+    buffers.last_key = key
+    buffers.last_result = value
+    return value
 
 
 def _transform_array(values, n):

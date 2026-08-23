@@ -301,6 +301,53 @@ def test_scalar_distance_cached_buffers_track_mutation_and_threads():
     assert np.allclose(actual, expected)
 
 
+def test_scalar_distance_query_cache_invalidation():
+    polygon = mb.b2PolygonShape(box=(1.0, 0.5))
+    circle = mb.b2CircleShape(radius=0.2)
+    transform_a = mb_xf()
+    transform_b = mb_xf(2.0, 0.0, 0.1)
+
+    first = mb.b2Distance(
+        shapeA=polygon, shapeB=circle,
+        transformA=transform_a, transformB=transform_b,
+    )
+    assert mb.b2Distance(
+        shapeA=polygon, shapeB=circle,
+        transformA=transform_a, transformB=transform_b,
+    ) is first
+
+    transform_b.position.x = 2.5
+    moved = mb.b2Distance(
+        shapeA=polygon, shapeB=circle,
+        transformA=transform_a, transformB=transform_b,
+    )
+    assert moved is not first
+    assert moved.distance != pytest.approx(first.distance)
+
+    circle.radius = 0.4
+    resized = mb.b2Distance(
+        shapeA=polygon, shapeB=circle,
+        transformA=transform_a, transformB=transform_b,
+    )
+    assert resized is not moved
+    assert resized.distance != pytest.approx(moved.distance)
+
+    uncapped = mb.b2Distance(
+        shapeA=polygon, shapeB=circle,
+        transformA=transform_a, transformB=transform_b, useRadii=False,
+    )
+    assert uncapped is not resized
+    assert uncapped.distance > resized.distance
+
+    other_polygon = mb.b2PolygonShape(box=(0.25, 0.25))
+    other = mb.b2Distance(
+        shapeA=other_polygon, shapeB=circle,
+        transformA=transform_a, transformB=transform_b,
+    )
+    assert other is not uncapped
+    assert other.distance > resized.distance
+
+
 def test_batch_overlap_matches_scalar_upstream():
     rng = np.random.default_rng(4)
     lower_a = rng.normal(size=(500, 2))

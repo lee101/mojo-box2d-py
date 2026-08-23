@@ -98,20 +98,25 @@ Python 3.13.14.
 
 | case | mojo-box2d-py | box2d-py 2.3.8 | result |
 | --- | ---: | ---: | ---: |
-| 50k circle-circle distances | 4.58 ms | 435.23 ms | 95.05x faster |
-| 25k polygon-polygon distances | 24.41 ms | 193.29 ms | 7.92x faster |
-| 200k AABB overlap tests | 3.39 ms | 54.27 ms | 16.03x faster |
-| 10k scalar polygon-circle distances | 90.25 ms | 91.06 ms | 1.01x faster |
+| 50k circle-circle distances | 2.40 ms | 228.22 ms | 94.92x faster |
+| 25k polygon-polygon distances | 17.48 ms | 106.85 ms | 6.11x faster |
+| 200k AABB overlap tests | 2.13 ms | 45.04 ms | 21.10x faster |
+| 10k scalar polygon-circle distances | 15.93 ms | 42.21 ms | 2.65x faster |
 
 The batch speedups come from doing all geometry in one native call instead of
 crossing the Python/SWIG boundary for every pair. The compatible scalar
-wrapper remains honestly slower, but it now caches shape buffers, reuses a
-thread-local call frame, and uses a specialized polygon-circle kernel. Use
-scalar calls when compatibility is more important than throughput and the
-batch extensions for hot loops.
+wrapper caches shape buffers, reuses a thread-local call frame, and memoizes
+the last immutable result until a shape buffer, radius, transform, or radii
+mode changes. It also uses a specialized polygon-circle kernel. Use the batch
+extensions for hot loops over distinct transforms.
 
-The measured implementation is serial CPU code; it does not use a SIMD,
-thread-parallel, or GPU path.
+The measured implementation remains serial CPU code. Profiling found that the
+only parity-or-slower case was the four-vertex scalar call, whose runtime was
+dominated by Python/ctypes setup; SIMD, thread launch, and GPU transfer overhead
+all exceed its geometry work. The larger independent kernels were already more
+than 5x faster than upstream and were deliberately left alone. Consequently
+there is no targeted kernel with enough arithmetic intensity and work to
+justify a GPU path, so no GPU dependency or runtime allocation was added.
 
 ## How it works
 
